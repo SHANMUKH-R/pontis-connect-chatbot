@@ -1,0 +1,15 @@
+# Code owners — auto-requests review when matching files change.
+# Replace placeholders with each member's GitHub username (@handle).
+# Requires the members to have push access to the repo.
+
+# Default: any change requests a review from the tech lead
+*                   @SHANMUKH-R
+
+# Core bot logic — tech lead reviews
+/src/               @SHANMUKH-R
+
+# Project docs — docs owner reviews
+/docs/              @SHANMUKH-R
+
+# TODO: add teammates, e.g.
+# /src/             @jack-handle @akshay-handle

@@ -3,25 +3,30 @@
 
 Team-based client engagement applying agentic AI to a real-world problem.
 
-## Team
-| Name | Andrew ID | Role |
-|------|-----------|------|
-| Shanmukh Rachakunta | srachaku | PM / client comms / agentic-AI design |
-| _[Member 2]_ | | |
-| _[Member 3]_ | | |
-| _[Member 4]_ | | |
+## Team Pontis
+| Name | Andrew ID | GitHub | Role |
+|------|-----------|--------|------|
+| Shanmukh Rachakunta | srachaku | @SHANMUKH-R | PM / client comms / agentic-AI design |
+| Jack | _[id]_ | _[@]_ | |
+| Premices | _[id]_ | _[@]_ | |
+| Akshay Iyer | _[id]_ | _[@]_ | |
+| Alan | _[id]_ | _[@]_ | |
 
 ## Client / Problem
 - **Project:** Connect ChatBot
-- **Client:** _[Connect — confirm name / ANONYMIZE if confidentiality requested]_
-- **Problem (as understood):** _[1–2 sentences — what the Connect chatbot should do]_
-- **Success by December:** _[the measurable outcome]_
+- **Client:** Confidential (anonymized per client request — identity held off-repo)
+- **Problem (as understood):** How can the client's membership website become more
+  responsive to its members? A chatbot answers member questions, **tracks what members
+  ask**, surfaces membership needs/patterns to the organization, and turns those into
+  **actionable changes to the website**.
+- **Success by December:** _[to confirm at first client meeting, Oct 2]_
 
 ## Project links
 - 📋 **Kanban board:** _[paste GitHub Project URL here once created]_
 - 📄 Team contract: [`docs/team-contract.md`](docs/team-contract.md)
 - 📄 Client meeting prep: [`docs/client-meeting-prep.md`](docs/client-meeting-prep.md)
 - 📄 Project scope (PMI): [`docs/project-scope.md`](docs/project-scope.md)
+- 🤝 How we work (PR rules): [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## Repo structure
 ```
