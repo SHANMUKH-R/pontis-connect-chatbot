@@ -1,4 +1,5 @@
 # i2ai Team Project — Fall 2026 (95-891)
+### Team Pontis · Project: Connect ChatBot
 
 Team-based client engagement applying agentic AI to a real-world problem.
 
@@ -11,8 +12,9 @@ Team-based client engagement applying agentic AI to a real-world problem.
 | _[Member 4]_ | | |
 
 ## Client / Problem
-- **Client:** _[name or ANONYMIZED if confidentiality requested]_
-- **Problem (as understood):** _[1–2 sentences]_
+- **Project:** Connect ChatBot
+- **Client:** _[Connect — confirm name / ANONYMIZE if confidentiality requested]_
+- **Problem (as understood):** _[1–2 sentences — what the Connect chatbot should do]_
 - **Success by December:** _[the measurable outcome]_
 
 ## Project links
