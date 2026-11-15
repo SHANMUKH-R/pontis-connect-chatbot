@@ -45,4 +45,4 @@ Use the template in `.github/pull_request_template.md`:
 ## Commit hygiene
 - Small, focused commits; present-tense messages (`add question logger`).
 - Never commit client data or secrets — see `.gitignore` (`data/` is ignored).
-  Client identity stays **out of the repo** (confidential).
+  The repo is public: only publicly available website content goes in, never anything a client shares with us.

@@ -14,7 +14,7 @@ Team-based client engagement applying agentic AI to a real-world problem.
 
 ## Client / Problem
 - **Project:** Connect ChatBot
-- **Client:** Confidential (anonymized per client request — identity held off-repo)
+- **Client:** to be confirmed (client engagement has not started yet)
 - **Problem (as understood):** How can the client's membership website become more
   responsive to its members? A chatbot answers member questions, **tracks what members
   ask**, surfaces membership needs/patterns to the organization, and turns those into
@@ -22,6 +22,7 @@ Team-based client engagement applying agentic AI to a real-world problem.
 - **Success by December:** _[to confirm at first client meeting, Oct 2]_
 
 ## Project links
+- 🌐 **Live demo (student prototype):** https://shanmukh-r.github.io/pontis-connect-chatbot/
 - 📋 **Kanban board:** _[paste GitHub Project URL here once created]_
 - 📄 Team contract: [`docs/team-contract.md`](docs/team-contract.md)
 - 📄 Client meeting prep: [`docs/client-meeting-prep.md`](docs/client-meeting-prep.md)
