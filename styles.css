@@ -53,6 +53,8 @@ mark { background: var(--gold); color: #000; }
 .skip-link:focus { transform: translateY(0); }
 
 /* Header and the original five navigation groups. */
+.prototype-banner { margin: 0; padding: 8px 16px; background: var(--ink); color: white; font-size: var(--small-size); text-align: center; }
+.prototype-banner a { color: var(--gold); }
 .site-header { background: var(--light); padding: 16px 0; }
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 32px; min-height: 87px; }
 .site-logo { flex-shrink: 0; }
