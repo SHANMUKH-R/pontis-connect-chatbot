@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from pontis_chat.appconfig import AppConfig
 from pontis_chat.dependency_injectors import initialize_app_config
+from pontis_chat.routes.chat import router as chat_router
 from pontis_chat.routes.test_app import router as test_app_router
 
 
@@ -24,6 +25,7 @@ def create_app(config: AppConfig | None = None, *, env_file: str | Path = ".env"
 
     application = FastAPI(title="Vantage Point", version="0.1.0", lifespan=lifespan)
     application.include_router(test_app_router)
+    application.include_router(chat_router)
     return application
 
 
