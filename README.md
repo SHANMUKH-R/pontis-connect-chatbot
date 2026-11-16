@@ -23,7 +23,7 @@ Team-based client engagement applying agentic AI to a real-world problem.
 
 ## Project links
 - 🌐 **Live demo (student prototype):** https://shanmukh-r.github.io/pontis-connect-chatbot/
-- 📋 **Kanban board:** _[paste GitHub Project URL here once created]_
+- 📋 **Kanban board:** https://github.com/users/SHANMUKH-R/projects/1
 - 📄 Team contract: [`docs/team-contract.md`](docs/team-contract.md)
 - 📄 Client meeting prep: [`docs/client-meeting-prep.md`](docs/client-meeting-prep.md)
 - 📄 Project scope (PMI): [`docs/project-scope.md`](docs/project-scope.md)
@@ -95,7 +95,7 @@ Use the startup-loaded settings in new routes through dependency injection:
 
 ```python
 from fastapi import APIRouter
-from vantage_point.dependency_injectors import AppConfigDep
+from pontis_chat.dependency_injectors import AppConfigDep
 
 router = APIRouter()
 
@@ -124,8 +124,5 @@ resources around the lifespan's `yield`, with cleanup in `finally`.
 ```sh
 uv run ruff check .
 uv run ruff format --check .
-uv run pytest tests/test_app.py tests/test_settings.py tests/test_smoke.py -q
+uv run pytest tests/test_app.py tests/test_settings.py -q
 ```
-
-The full suite (`uv run pytest -q`) also requires Postgres with pgvector; start it
-with `make up`.
