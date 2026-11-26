@@ -3,7 +3,7 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -13,6 +13,7 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pontis_chat.agent.loop import PROMPT_MARKER, run_agent
+from pontis_chat.agent.providers import ModelUnavailable, OpenAICompatibleClient
 from pontis_chat.agent.tools import ToolContext
 from pontis_chat.guardrails import InputVerdict, check_input, check_output
 from pontis_chat.guardrails.checks import redact_pii
@@ -31,11 +32,27 @@ class ChatSettings(BaseSettings):
     knowledge_base_dir: str = "data/knowledge_base"
     question_log_path: str = "data/question_log.jsonl"
     guardrails: bool = True
+    # False swaps the system prompt for a bare one with no behavior rules. For evaluation only.
+    agent_rules: bool = True
+    # True also logs each answer and the passages the model was shown, so answers can be graded for
+    # groundedness. For evaluation runs only: it makes the log large.
+    log_evidence: bool = False
     # Without a key the service still runs, answering with the best search excerpt only.
     anthropic_api_key: SecretStr | None = Field(default=None, repr=False)
     anthropic_model: str = "claude-haiku-5-5"
+    # A second model for comparison runs, reached through an OpenAI-compatible API (Gemini, Groq, Ollama).
+    # Used instead of Claude when LLM_PROVIDER=openai_compatible.
+    llm_provider: str = Field(default="anthropic", pattern="^(anthropic|openai_compatible)$")
+    llm_base_url: str = ""
+    llm_api_key: SecretStr | None = Field(default=None, repr=False)
+    llm_model: str = ""
+    llm_min_interval_seconds: float = Field(default=0.0, ge=0)
     agent_effort: str = "low"
     agent_max_steps: int = Field(default=6, ge=1, le=12)
+
+    @property
+    def model_name(self) -> str:
+        return self.llm_model if self.llm_provider == "openai_compatible" else self.anthropic_model
 
 
 @dataclass
@@ -63,14 +80,15 @@ class ChatService:
         else:
             verdict = InputVerdict(question or "", question or "")
 
-        ctx = ToolContext(self.kb, enforce_citations=self.settings.guardrails)
+        guarded = self.settings.guardrails
+        ctx = ToolContext(self.kb, enforce_citations=guarded, screen_retrieved=guarded)
         if verdict.direct_answer is not None:
             reply = ChatReply(verdict.direct_answer, [], verdict.direct_status, mode="guardrail")
         elif self.client is not None:
             reply = self._agent_reply(ctx, verdict.question, history)
         else:
             reply = self._retrieval_only_reply(ctx, verdict.search_query, history)
-        reply.flags = list(verdict.flags) + reply.flags
+        reply.flags = list(verdict.flags) + ctx.flags + reply.flags
 
         if self.settings.guardrails and reply.mode != "guardrail":
             checked = check_output(
@@ -89,13 +107,17 @@ class ChatService:
             result = run_agent(
                 self.client,
                 ctx,
-                model=settings.anthropic_model,
+                model=settings.model_name,
                 org_name=settings.org_name,
                 question=question,
                 history=history,
                 effort=settings.agent_effort,
                 max_steps=settings.agent_max_steps,
+                rules=settings.agent_rules,
             )
+        except ModelUnavailable as error:
+            logger.warning("language model unavailable: %s", error.reason)
+            return ChatReply(TEMPORARILY_DOWN, [], "error", flags=[error.reason])
         except anthropic.RateLimitError:
             logger.warning("language model rate limited")
             return ChatReply(TEMPORARILY_DOWN, [], "error", flags=["llm_rate_limited"])
@@ -137,6 +159,9 @@ class ChatService:
             "flags": reply.flags,
             "sources": [source["url"] for source in reply.sources],
         }
+        if self.settings.log_evidence:
+            record["answer"] = reply.answer
+            record["evidence"] = ctx.evidence
         try:
             path = Path(self.settings.question_log_path)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -151,7 +176,20 @@ def get_chat_service() -> ChatService:
     """Build the service once per process: load settings, index the knowledge base, create the client."""
     settings = ChatSettings()
     kb = KnowledgeBase.from_directory(settings.knowledge_base_dir)
-    key = settings.anthropic_api_key
-    client = anthropic.Anthropic(api_key=key.get_secret_value()) if key else None
+    client = build_client(settings)
     logger.info("chat service ready: %d chunks, mode=%s", len(kb.chunks), "agent" if client else "retrieval_only")
     return ChatService(kb, settings, client)
+
+
+def build_client(settings: ChatSettings) -> Any | None:
+    """Create the model client the settings ask for, or None when its key is missing."""
+    if settings.llm_provider == "openai_compatible":
+        if not (settings.llm_api_key and settings.llm_base_url and settings.llm_model):
+            return None
+        return OpenAICompatibleClient(
+            api_key=settings.llm_api_key.get_secret_value(),
+            base_url=settings.llm_base_url,
+            min_interval_seconds=settings.llm_min_interval_seconds,
+        )
+    key = settings.anthropic_api_key
+    return anthropic.Anthropic(api_key=key.get_secret_value()) if key else None

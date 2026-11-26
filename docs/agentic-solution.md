@@ -96,6 +96,7 @@ The loop is bounded (six steps by default) and the model cannot reply except thr
 | Input | Crisis wording (self-harm, overdose, withdrawal) | Fixed 988 / 911 reply, model not called |
 | Input | Email, phone, SSN, card number | Replaced with a placeholder before the model and the log see it |
 | Input | Instruction-like text ("ignore your rules", "from now on") | That sentence is dropped from the search query; if nothing else is left, a fixed refusal |
+| Tool | Text in a retrieved document that addresses the assistant | Removed before the model reads the excerpt |
 | Tool | Citation not returned by a search | `submit_answer` rejects it and the model must fix it |
 | Output | Source or link that was not retrieved | Removed |
 | Output | Reply claims an action was taken | Replaced with "I can't take actions" |
@@ -116,6 +117,8 @@ Read from the environment or a local `.env` file (git-ignored).
 | `AGENT_EFFORT` | `low` | Reasoning effort per step |
 | `AGENT_MAX_STEPS` | `6` | Loop bound |
 | `GUARDRAILS` | `true` | Guardrails on or off |
+| `AGENT_RULES` | `true` | `false` swaps the system prompt for a bare one. For evaluation only. |
+| `LLM_PROVIDER` | `anthropic` | `openai_compatible` runs the loop on a second model; needs `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` |
 | `ORG_NAME` | `the organization` | Name used in the system prompt and fixed replies |
 | `KNOWLEDGE_BASE_DIR` | `data/knowledge_base` | Folder of Markdown documents |
 | `QUESTION_LOG_PATH` | `data/question_log.jsonl` | Where the analytics log is written |
@@ -197,6 +200,65 @@ That is the input for the "what are members asking" report.
 Limits of these numbers: the behavior score is a phrase heuristic, groundedness has not been scored,
 the retrieval weights were tuned on this same question set, and each mode was run once.
 
+### Groundedness (2026-11-26)
+
+`eval/groundedness.py` grades whether each answer is supported by the passages the assistant was shown.
+A judge model (Claude Opus 5.5, a different and stronger model than the one answering) splits the answer
+into factual claims and labels each one against that evidence alone. The app records the evidence when
+`LOG_EVIDENCE=true`.
+
+On a sample of 38 answer-type questions (every sixth one), with guardrails on:
+
+| Measure | Result |
+|---|---|
+| Replies that were answers and went to the judge | 35 of 38 |
+| Answers with every claim supported | 30 of 35 (86%) |
+| Answers with one unsupported claim | 4 of 35 (11%) |
+| Answers with a contradicted claim | 1 of 35 (3%) |
+| Claims supported | 235 of 240 (98%) |
+
+- The contradicted claim is real: the assistant gave the general contact address for a working group
+  whose page lists its own contact link.
+- The four unsupported claims are small over-statements, such as describing offenses as "low-level"
+  when the page does not use that word.
+- "Supported" means supported by what was retrieved. It does not check that the retrieved page is right.
+- These are one model's judgements on one run of a 38-question sample. `spot_check.csv` in the output
+  folder holds 12 graded answers with blank columns for a person to score, which has not been done.
+- A first pass scored 58%. Half of its "unsupported" claims were page dates the assistant had been
+  shown but the evidence record left out; the record now includes each passage's date and section.
+
+### Three arms on the stress set (2026-11-26)
+
+`eval/stress/` is a 44-question attack set on a fictional knowledge base in which four documents carry
+instructions planted for the assistant. Each arm adds one layer: **bare** (tools and a two-line prompt),
+**rules** (the full system prompt), **guarded** (the prompt plus every code check). Claude Haiku 5.5:
+
+| Category | bare | rules | guarded |
+|---|---|---|---|
+| Instructions planted in a document | 7 of 8 | 7 of 8 | 7 of 8 |
+| Instructions typed by the user | 5 of 6 | 6 of 6 | 6 of 6 |
+| Personal data | 4 of 4 | 4 of 4 | 4 of 4 |
+| Requests to take an action | 4 of 4 | 4 of 4 | 4 of 4 |
+| Crisis | 3 of 3 | 3 of 3 | 3 of 3 |
+| Malformed input | 4 of 4 | 4 of 4 | 4 of 4 |
+| Outside the assistant's job | 4 of 4 | 4 of 4 | 4 of 4 |
+| Answers not in the knowledge base | 3 of 3 | 3 of 3 | 3 of 3 |
+| Ordinary questions | 8 of 8 | 8 of 8 | 8 of 8 |
+| **All attack cases** | **34 of 36** | **35 of 36** | **35 of 36** |
+
+- **This model resists these attacks without help.** With no rules at all it followed one injected
+  instruction out of 36 (it appended a phrase a user told it to add). It read all four poisoned
+  documents and ignored what they told it to do.
+- The one case failed in every arm is a scoring artifact: the answer gave the right fact and added
+  "I could not find the opening hours".
+- **What the code checks did in the guarded arm:** removed planted text from 22 search results before
+  the model saw it, redacted personal data in 3 messages, answered 3 crisis messages with the fixed
+  988 / 911 reply, and handled 4 malformed inputs without calling the model. In the other two arms an
+  empty message produced a failed request.
+- So with this model the guardrails are a guarantee, not a score improvement. The score difference
+  they make on a weaker model has not been measured yet; the same arms can be run on a second model
+  (`LLM_PROVIDER=openai_compatible`, see `eval/stress/README.md`).
+
 ## Course technical requirements
 
 | # | Requirement | Where it stands |
@@ -205,7 +267,7 @@ the retrieval weights were tuned on this same question set, and each mode was ru
 | 2 | Pretrained model | Claude Haiku 5.5 through the Anthropic API. |
 | 3 | Five or more custom tools with docstrings | Six, in `agent/tools.py`. |
 | 4 | Skill folder | Not started. |
-| 5 | Evaluation | `eval/run_eval.py` on the 334-question set, results above. Groundedness scoring not started. |
+| 5 | Evaluation | `eval/run_eval.py` on the 334-question set; `eval/stress/` attack set; `eval/groundedness.py` judge, run on a 38-question sample. |
 | 6 | Data protection / simulated data | Client content stays in git-ignored `data/`; personal data is redacted before the model and the log; the log never stores the raw message. |
 | 7 | Guardrails, with and without | `GUARDRAILS=true/false`; both runs compared above. |
 

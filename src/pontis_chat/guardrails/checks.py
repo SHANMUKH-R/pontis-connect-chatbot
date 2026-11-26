@@ -34,7 +34,7 @@ _INJECTION = re.compile(
     r"\b(system|developer|hidden|initial) (prompt|message|instruction)s?\b|"
     r"\b(reveal|print|show|repeat|output|leak)\b[^.?!\n]{0,30}\b(instruction|prompt|rule|configuration)s?\b|"
     r"\b(what|which) (were|are) (the |your )?(exact )?(instruction|rule|prompt)s?\b|"
-    r"\byou are now\b|\bfrom now on\b|\bnew instructions?\b|\bdeveloper mode\b|\bjailbreak\b|\bDAN\b|"
+    r"\byou are now\b|\bfrom now on\b|\bnew instructions?\b|\bdeveloper mode\b|\bjailbreak\b|(?-i:\bDAN\b)|"
     r"\b(pretend|act|role-?play)\b[^.?!\n]{0,20}\b(you are|you're|to be|as)\b",
     re.I,
 )
@@ -48,6 +48,23 @@ _ACTION_CLAIM = re.compile(
 )
 
 _URL = re.compile(r"https?://[^\s)\]>\"']+")
+
+# Text addressed to the assistant instead of the reader: the mark of an instruction planted in a document.
+# Narrower than _INJECTION, because ordinary reports say things like "act as an anchor".
+_PLANTED = re.compile(
+    r"(ignore|disregard|forget|override)\b[^.?!\n]{0,40}\b(previous|prior|above|earlier|your|all)\b[^.?!\n]{0,20}"
+    r"\b(instruction|rule|prompt|guideline)\w*|"
+    r"\b(system|developer|hidden) prompt\b|\byou are now\b|\bfrom now on\b|\bnew instructions?\b|"
+    r"\b(a\.?i\.?|chat ?bot|language model|llm) (assistant|model|agent|bot)?\b[^.?!\n]{0,40}"
+    r"\b(must|should|ignore|disregard|tell|always|never|instruction|reveal|say)\w*|"
+    r"\b(note|message|instructions?|reminder)s? (to|for) (the |any |all )?(a\.?i\.?|assistant|chat ?bot|model|bot)\b|"
+    r"\bassistant (instructions?|notes?|directives?)\b|\bsystem (note|override|message|directive)\b|"
+    r"\btell (the|every|all|each|any) (user|member|visitor|reader)s?\b|"
+    r"\bend (every|each|all) (answer|reply|response)s?\b",
+    re.I,
+)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+REMOVED_NOTE = "[instruction-like text removed]"
 
 
 def crisis_message() -> str:
@@ -85,6 +102,25 @@ def redact_pii(text: str) -> tuple[str, list[str]]:
 def normalize_url(url: str) -> str:
     url = re.sub(r"^https?://(www\.)?", "", url.strip().lower())
     return url.split("#")[0].rstrip("/.,;")
+
+
+def screen_retrieved_text(text: str) -> tuple[str, int]:
+    """Remove instruction-like sentences from a document excerpt before the model reads it.
+
+    A page in the knowledge base, or a file a member uploads, can carry text written to steer the
+    assistant. Retrieved text is information for the member, so anything addressed to the assistant
+    is dropped. Returns the cleaned text and how many pieces were removed.
+    """
+    text, removed = _HTML_COMMENT.subn(REMOVED_NOTE, text)
+    kept: list[str] = []
+    for sentence in _SENTENCE_END.split(text):
+        if _PLANTED.search(sentence):
+            removed += 1
+            if not kept or kept[-1] != REMOVED_NOTE:
+                kept.append(REMOVED_NOTE)
+        else:
+            kept.append(sentence)
+    return " ".join(kept), removed
 
 
 @dataclass(frozen=True)

@@ -83,50 +83,30 @@ const chatMessages = document.querySelector('#chat-messages');
 const chatScroll = document.querySelector('#chat-scroll');
 const chatStatus = document.querySelector('#chat-status');
 const suggestedQuestions = document.querySelectorAll('.chat-suggestions button');
-const chatStorageKey = 'connect-assistant-demo-history';
+const chatStorageKey = 'connect-assistant-history';
 let chatHistory = [];
 let responsePending = false;
 
-// Replace this function with an API request when the backend is ready.
+// The chat API is on this page's origin unless the page names another one, for a static host:
+// <meta name="chat-api-base" content="https://api.example.org">
+const chatApiBase = (document.querySelector('meta[name="chat-api-base"]')?.content || '').replace(/\/+$/, '');
+const chatRequestTimeoutMs = 45000;
+// Sources may link to the organization's site and to the document hosts its reports and newsletters use.
+const chatSourceHosts = ['connectgovs.org', 'drive.google.com', 'docs.google.com', 'eepurl.com', 'mailchi.mp'];
+
 // Response: { answer: string, sources: [{ title, url }], status: 'ok' | 'unavailable' | 'error' }.
 async function sendChatMessage(question) {
-  await new Promise(resolve => setTimeout(resolve, 550));
-  const text = question.toLowerCase();
-  const examples = [
-    {
-      keywords: ['what does connect do', 'mission', 'about connect'],
-      answer: 'CONNECT brings Pittsburgh and neighboring municipalities together to work on shared public-policy challenges and develop solutions collaboratively.',
-      sources: [{ title: 'CONNECT — Mission and Vision', url: 'https://connectgovs.org/' }]
-    },
-    {
-      keywords: ['climate', 'resilience', 'reports'],
-      answer: 'Start with CONNECT’s Reports page for official publications. This example does not search the report collection or confirm a particular climate action report. Visit the official page to review the available documents.',
-      sources: [{ title: 'CONNECT Reports', url: 'https://connectgovs.org/reports/' }]
-    },
-    {
-      keywords: ['priorities', 'initiatives'],
-      answer: 'CONNECT’s website organizes priorities into Public Safety & Wellbeing, Infrastructure & Resilience, Emerging Priorities, and Ongoing Priorities. Visit the official Priorities page for the latest project information.',
-      sources: [{ title: 'CONNECT Priorities', url: 'https://connectgovs.org/priorities/' }]
-    },
-    {
-      keywords: ['get involved', 'join', 'membership', 'participate'],
-      answer: 'The CONNECT homepage links to membership information for municipalities. You can also explore the Member Center or contact info@connectgovs.org to ask about getting involved.',
-      sources: [
-        { title: 'CONNECT — Municipal Membership', url: 'https://connectgovs.org/' },
-        { title: 'CONNECT Member Center', url: 'https://connectgovs.org/member-center/' }
-      ]
-    }
-  ];
-  const example = examples.find(item => item.keywords.some(keyword => text.includes(keyword)));
-  if (example) return { answer: example.answer, sources: example.sources, status: 'ok' };
-  return {
-    answer: 'That question is not covered by this demonstration. Try one of the suggested questions, or explore CONNECT’s official Reports and Member Center pages.',
-    sources: [
-      { title: 'CONNECT Reports', url: 'https://connectgovs.org/reports/' },
-      { title: 'CONNECT Member Center', url: 'https://connectgovs.org/member-center/' }
-    ],
-    status: 'unavailable'
-  };
+  // Earlier questions give a follow-up like "Who is eligible?" its context.
+  const asked = chatHistory.filter(message => message.role === 'user').map(message => message.answer);
+  if (asked.at(-1) === question) asked.pop();
+  const response = await fetch(`${chatApiBase}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, history: asked.slice(-6) }),
+    signal: AbortSignal.timeout(chatRequestTimeoutMs)
+  });
+  if (!response.ok) throw new Error(`Chat request failed with status ${response.status}`);
+  return response.json();
 }
 
 function saveChatHistory() {
@@ -145,7 +125,7 @@ function updateChatControls() {
   chatSend.disabled = responsePending || !chatInput.value.trim();
   suggestedQuestions.forEach(button => { button.disabled = responsePending; });
   chatMessages.querySelectorAll('.chat-retry').forEach(button => { button.disabled = responsePending; });
-  chatStatus.textContent = responsePending ? 'Preparing an example response…' : '';
+  chatStatus.textContent = responsePending ? 'Finding an answer…' : '';
 }
 
 function appendChatMessage(message, retryQuestion) {
@@ -155,8 +135,7 @@ function appendChatMessage(message, retryQuestion) {
 
   const label = document.createElement('span');
   label.className = 'chat-message-label';
-  label.textContent = message.role === 'user' ? 'You' : 'CONNECT · Example response';
-  if (message.status === 'unavailable') label.textContent = 'CONNECT · Not available in this demo';
+  label.textContent = message.role === 'user' ? 'You' : 'CONNECT · Assistant';
   if (message.status === 'error') label.textContent = 'CONNECT · Response unavailable';
   const answer = document.createElement('p');
   answer.textContent = message.answer;
@@ -166,10 +145,11 @@ function appendChatMessage(message, retryQuestion) {
   sources.className = 'chat-sources';
   const sourceList = document.createElement('ul');
   for (const source of Array.isArray(message.sources) ? message.sources : []) {
-    // Treat future backend citation text and URLs as untrusted input.
+    // Treat backend citation text and URLs as untrusted input.
     let url;
     try { url = new URL(source.url); } catch { continue; }
-    if (url.protocol !== 'https:' || (url.hostname !== 'connectgovs.org' && !url.hostname.endsWith('.connectgovs.org'))) continue;
+    const allowedHost = chatSourceHosts.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`));
+    if (url.protocol !== 'https:' || !allowedHost) continue;
     const link = document.createElement('a');
     link.href = url.href;
     link.textContent = source.title || 'CONNECT source';

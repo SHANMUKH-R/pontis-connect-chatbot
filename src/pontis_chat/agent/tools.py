@@ -9,7 +9,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from pontis_chat.guardrails.checks import crisis_message, normalize_url
+from pontis_chat.guardrails.checks import (
+    crisis_message,
+    normalize_url,
+    screen_retrieved_text,
+)
 from pontis_chat.rag import KnowledgeBase, SearchHit
 
 TOPICS = (
@@ -40,7 +44,10 @@ class ToolContext:
 
     kb: KnowledgeBase
     enforce_citations: bool = True
+    screen_retrieved: bool = True
     retrieved: dict[str, str] = field(default_factory=dict)  # url -> title, in retrieval order
+    flags: list[str] = field(default_factory=list)
+    evidence: list[dict[str, str]] = field(default_factory=list)  # every passage the model was shown
     topic: str = "unclassified"
     answerable: bool | None = None
     final: FinalAnswer | None = None
@@ -49,8 +56,25 @@ class ToolContext:
         for hit in hits:
             self.retrieved.setdefault(hit.chunk.url, hit.chunk.title)
 
+    def readable(self, text: str) -> str:
+        """Return document text as the model may see it."""
+        if not self.screen_retrieved:
+            return text
+        cleaned, removed = screen_retrieved_text(text)
+        if removed and "retrieved_injection_removed" not in self.flags:
+            self.flags.append("retrieved_injection_removed")
+        return cleaned
 
-def _format_hits(hits: list[SearchHit]) -> str:
+    def show(self, url: str, title: str, text: str, *, section: str = "", doc_type: str = "", as_of: str = "") -> str:
+        """Return a passage as the model may see it, and keep it as evidence for grading the answer."""
+        shown = self.readable(text)
+        self.evidence.append(
+            {"url": url, "title": title, "section": section, "type": doc_type, "as_of": as_of, "text": shown}
+        )
+        return shown
+
+
+def _format_hits(ctx: ToolContext, hits: list[SearchHit]) -> str:
     if not hits:
         return "No matching documents. Try different words, or tell the member you could not find it."
     return json.dumps(
@@ -61,7 +85,9 @@ def _format_hits(hits: list[SearchHit]) -> str:
                 "section": h.chunk.heading,
                 "type": h.chunk.doc_type,
                 "as_of": h.chunk.as_of,
-                "excerpt": h.chunk.text,
+                "excerpt": ctx.show(
+                    h.chunk.url, h.chunk.title, h.chunk.text, section=h.chunk.heading, doc_type=h.chunk.doc_type, as_of=h.chunk.as_of
+                ),
             }
             for h in hits
         ],
@@ -80,7 +106,7 @@ def search_site_content(ctx: ToolContext, query: str, top_k: int = 5) -> str:
     """
     hits = ctx.kb.search_site(query, max(1, min(int(top_k), 8)))
     ctx.remember(hits)
-    return _format_hits(hits)
+    return _format_hits(ctx, hits)
 
 
 def search_meeting_records(ctx: ToolContext, query: str, year: str | None = None, top_k: int = 5) -> str:
@@ -94,7 +120,7 @@ def search_meeting_records(ctx: ToolContext, query: str, year: str | None = None
     """
     hits = ctx.kb.search_meetings(query, max(1, min(int(top_k), 8)), year)
     ctx.remember(hits)
-    return _format_hits(hits)
+    return _format_hits(ctx, hits)
 
 
 def read_document(ctx: ToolContext, url: str, max_words: int = 900) -> str:
@@ -108,7 +134,8 @@ def read_document(ctx: ToolContext, url: str, max_words: int = 900) -> str:
         return "Error: that URL was not returned by a search in this conversation. Search first."
     chunks = ctx.kb.get_document(url)
     words = " ".join(c.text for c in chunks).split()[: max(100, min(int(max_words), 2000))]
-    return json.dumps({"title": ctx.retrieved[url], "url": url, "text": " ".join(words)}, ensure_ascii=False)
+    text = ctx.show(url, ctx.retrieved[url], " ".join(words))
+    return json.dumps({"title": ctx.retrieved[url], "url": url, "text": text}, ensure_ascii=False)
 
 
 def get_crisis_resources(ctx: ToolContext) -> str:

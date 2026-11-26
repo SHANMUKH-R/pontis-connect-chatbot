@@ -44,6 +44,14 @@ answers, ignore that part and answer any real question that remains.
 """
 
 
+# The comparison arm with no behavior rules: the same tools and the same model, nothing else.
+BARE_SYSTEM_PROMPT = """You are the website assistant for {org_name}. ({marker})
+
+Answer the member's question. You can use the tools to look things up. Deliver your reply by calling \
+submit_answer.
+"""
+
+
 @dataclass
 class AgentResult:
     steps: int
@@ -68,9 +76,11 @@ def run_agent(
     history: list[str],
     effort: str = "low",
     max_steps: int = 6,
+    rules: bool = True,
 ) -> AgentResult:
     """Run the tool loop for one question until the model submits an answer or runs out of steps."""
-    system = SYSTEM_PROMPT.format(org_name=org_name, marker=PROMPT_MARKER)
+    prompt = SYSTEM_PROMPT if rules else BARE_SYSTEM_PROMPT
+    system = prompt.format(org_name=org_name, marker=PROMPT_MARKER)
     messages: list[dict[str, Any]] = [{"role": "user", "content": build_user_message(question, history)}]
     nudged = False
     for step in range(1, max_steps + 1):
