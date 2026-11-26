@@ -1,0 +1,32 @@
+[project]
+name = "pontis-chat"
+version = "0.1.0"
+description = "Website assistant backend: retrieval, agent loop and guardrails"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.8,<3",
+    "fastapi>=0.115,<1",
+    "openai>=3,<4",
+    "psycopg[binary]>=3.3.6",
+    "pydantic-settings>=2.6,<3",
+    "uvicorn[standard]>=0.30,<1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27,<1",
+    "pytest",
+    "ruff",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pontis_chat"]
+
+[tool.pytest.ini_options]
+# main.py sits at the repository root and is imported by the tests.
+pythonpath = ["."]
+testpaths = ["tests"]

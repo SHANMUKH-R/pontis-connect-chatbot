@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from main import create_app
-from vantage_point.appconfig import AppConfig
-from vantage_point.dependency_injectors import AppConfigDep
+from pontis_chat.appconfig import AppConfig
+from pontis_chat.dependency_injectors import AppConfigDep
 
 
 def test_startup_loads_settings_and_routes_can_access_them(tmp_path, monkeypatch):
