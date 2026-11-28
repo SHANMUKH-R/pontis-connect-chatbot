@@ -49,8 +49,10 @@ src/             project code
 Requires Python 3.12+ and uv. From the repository root:
 
 ```sh
-cp .env.example .env
+cp src/pontis_chat/.env.example .env
 uv sync
+docker compose --env-file .env -f src/pontis_chat/compose.yaml up -d --wait
+uv run alembic -c src/pontis_chat/alembic.ini upgrade head
 uv run uvicorn main:app --reload
 ```
 
@@ -60,13 +62,24 @@ http://127.0.0.1:8000/health for process health. Health does not check Postgres.
 ## Structure
 
 ```text
-main.py                         # App factory, lifespan, ASGI entry point (not installed)
+main.py                         # Compatibility ASGI entry point (not installed)
 src/pontis_chat/
+├── application.py              # App factory, lifespan and router registration
+├── backend/                    # Database, logging and request budgets
+├── migrations/                 # Alembic migration environment and revisions
+├── alembic.ini                 # Migration configuration
+├── compose.yaml                # Local Postgres
+├── Dockerfile                  # Backend image; build from repository root
+├── Dockerfile.dockerignore     # Image build context exclusions
+├── .env.example                # Placeholder configuration
+├── docs/backend.md             # Setup and deployment instructions
+├── tests/test_backend.py       # Opt-in Postgres integration checks
 ├── dependency_injectors.py      # Startup initializer and AppConfigDep alias
 ├── appconfig/
 │   ├── __init__.py
 │   └── app_config.py            # Typed configuration and app.state accessor
 └── routes/
+    ├── sessions/                # Session creation, messages, history and deletion
     ├── __init__.py
     └── test_app/
         ├── __init__.py          # Exports the feature router
@@ -86,7 +99,7 @@ Keep credentials in the ignored `.env` file or deployment environment.
 
 | Variable | Type | Default |
 | --- | --- | --- |
-| `APP_NAME` | Nonempty string | `Vantage Point` |
+| `APP_NAME` | Nonempty string | `Pontis Connect` |
 | `DATABASE_URL` | PostgreSQL DSN | Required |
 | `GUARDRAILS` | Boolean | `true` |
 | `HEALTH_STATUS` | Nonempty string | `Ok` |
@@ -95,7 +108,7 @@ Use the startup-loaded settings in new routes through dependency injection:
 
 ```python
 from fastapi import APIRouter
-from vantage_point.dependency_injectors import AppConfigDep
+from pontis_chat.dependency_injectors import AppConfigDep
 
 router = APIRouter()
 
@@ -115,17 +128,18 @@ lifespan handlers, so lifespan calls `initialize_app_config` directly before
 `HEALTH_STATUS` to another string to change the response. This is process health,
 not a database readiness check.
 
-`GUARDRAILS` is available in both states for future application logic; the template
-does not implement RAG or authorization. Add database pools and other shared
-resources around the lifespan's `yield`, with cleanup in `finally`.
+The application creates a Postgres connection pool during startup and disposes of it
+at shutdown. Chat requests require the migrated database. Session routes use bearer
+tokens; `/chat` remains public and keeps its existing response fields.
 
 ## Checks
 
 ```sh
 uv run ruff check .
 uv run ruff format --check .
-uv run pytest tests/test_app.py tests/test_settings.py tests/test_smoke.py -q
+uv run pytest -q
 ```
 
-The full suite (`uv run pytest -q`) also requires Postgres with pgvector; start it
-with `make up`.
+Backend integration tests use a disposable schema in the Postgres database named by
+`BACKEND_TEST_DATABASE_URL`; they skip when it is unset. No pgvector extension is
+needed for this schema. See [backend setup and deployment](src/pontis_chat/docs/backend.md).

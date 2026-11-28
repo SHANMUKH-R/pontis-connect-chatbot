@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,6 +12,8 @@ from fastapi.testclient import TestClient
 from pontis_chat.agent.loop import PROMPT_MARKER
 from pontis_chat.agent.service import ChatService, ChatSettings, get_chat_service
 from pontis_chat.agent.tools import TOOLS
+from pontis_chat.backend.database import get_db
+from pontis_chat.backend.limits import enforce_limits
 from pontis_chat.rag import KnowledgeBase
 from pontis_chat.routes.chat import router
 
@@ -183,6 +186,12 @@ def test_chat_endpoint_returns_the_agreed_response_shape(kb, settings):
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[get_chat_service] = lambda: ChatService(kb, settings, client=None)
+    # This unit test checks the HTTP contract; database behavior has its own
+    # opt-in Postgres integration tests.
+    app.dependency_overrides[enforce_limits] = lambda: None
+    app.dependency_overrides[get_db] = lambda: SimpleNamespace(
+        begin=nullcontext, execute=lambda *args, **kwargs: None
+    )
 
     response = TestClient(app).post("/chat", json={"question": "recycling program", "history": []})
 

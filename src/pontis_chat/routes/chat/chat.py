@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from pontis_chat.agent.service import ChatService, get_chat_service
+from pontis_chat.backend.database import DatabaseDep
+from pontis_chat.backend.limits import enforce_limits
+from pontis_chat.backend.service import PersistentChatService
+from pontis_chat.guardrails.checks import redact_pii
 
 router = APIRouter(tags=["chat"])
 
@@ -29,9 +33,14 @@ class ChatResponse(BaseModel):
     flags: list[str]
 
 
-@router.post("/chat", response_model=ChatResponse)
-def chat(body: ChatRequest, service: ChatServiceDep) -> ChatResponse:
-    reply = service.answer(body.question, body.history)
+@router.post(
+    "/chat", response_model=ChatResponse, dependencies=[Depends(enforce_limits)]
+)
+def chat(body: ChatRequest, service: ChatServiceDep, db: DatabaseDep) -> ChatResponse:
+    with db.begin():
+        reply = PersistentChatService(service, db).answer(
+            redact_pii(body.question)[0], [redact_pii(turn)[0] for turn in body.history]
+        )
     return ChatResponse(
         answer=reply.answer,
         sources=[Source(**source) for source in reply.sources],
