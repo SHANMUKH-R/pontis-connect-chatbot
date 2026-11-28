@@ -65,7 +65,7 @@ http://127.0.0.1:8000/health for process health. Health does not check Postgres.
 main.py                         # Compatibility ASGI entry point (not installed)
 src/pontis_chat/
 ├── application.py              # App factory, lifespan and router registration
-├── backend/                    # Database, sessions, logging and request budgets
+├── backend/                    # Database, logging and request budgets
 ├── migrations/                 # Alembic migration environment and revisions
 ├── alembic.ini                 # Migration configuration
 ├── compose.yaml                # Local Postgres
@@ -79,6 +79,7 @@ src/pontis_chat/
 │   ├── __init__.py
 │   └── app_config.py            # Typed configuration and app.state accessor
 └── routes/
+    ├── sessions/                # Session creation, messages, history and deletion
     ├── __init__.py
     └── test_app/
         ├── __init__.py          # Exports the feature router

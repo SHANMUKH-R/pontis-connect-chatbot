@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 from sqlalchemy import text
 
 from pontis_chat.backend.database import DatabaseDep
@@ -146,7 +146,7 @@ def send_message(
 
         # Redact every string in the stored response, including metadata. Do not
         # redact serialized JSON (doing so can corrupt JSON escape sequences).
-        def redact(value):
+        def redact(value: JsonValue) -> JsonValue:
             if isinstance(value, str):
                 return redact_pii(value)[0]
             if isinstance(value, list):
@@ -155,7 +155,7 @@ def send_message(
                 return {key: redact(item) for key, item in value.items()}
             return value
 
-        stored = redact(result.model_dump())
+        stored = {key: redact(value) for key, value in result.model_dump().items()}
         db.execute(
             text("""
             INSERT INTO messages (session_id, role, content) VALUES (:id, 'user', :question)

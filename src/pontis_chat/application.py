@@ -10,9 +10,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from pontis_chat.appconfig import AppConfig
 from pontis_chat.backend.database import database_engine
-from pontis_chat.backend.sessions import router as sessions_router
 from pontis_chat.dependency_injectors import initialize_app_config
 from pontis_chat.routes.chat import router as chat_router
+from pontis_chat.routes.sessions import router as sessions_router
 from pontis_chat.routes.site import router as site_router
 from pontis_chat.routes.test_app import router as test_app_router
 
