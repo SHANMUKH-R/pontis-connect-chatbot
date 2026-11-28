@@ -19,3 +19,7 @@ def test_home_page_and_its_assets_are_served():
 def test_nothing_else_in_the_repository_root_is_served():
     for path in ("/.env", "/main.py", "/data/question_log.jsonl", "/README.md"):
         assert client().get(path).status_code == 404
+
+
+def test_page_declares_where_its_chat_backend_is():
+    assert '<meta name="chat-api-base" content="">' in client().get("/").text

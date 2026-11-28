@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from vantage_point.appconfig import AppConfig
+from pontis_chat.appconfig import AppConfig
 
 
 @pytest.fixture(autouse=True)

@@ -87,9 +87,15 @@ const chatStorageKey = 'connect-assistant-history';
 let chatHistory = [];
 let responsePending = false;
 
-// The chat API is on this page's origin unless the page names another one, for a static host:
-// <meta name="chat-api-base" content="https://api.example.org">
-const chatApiBase = (document.querySelector('meta[name="chat-api-base"]')?.content || '').replace(/\/+$/, '');
+// The chat API is on this page's origin unless the chat-api-base meta tag in index.html names another one.
+const chatApiBase = (document.querySelector('meta[name="chat-api-base"]')?.content || '').trim().replace(/\/+$/, '');
+// A static host serves the page but has no chat API behind it: it answers /chat with "not found" or
+// "method not allowed". That is a setup gap, not an outage, so it gets its own message and no retry.
+const chatNotConnected = {
+  answer: 'The assistant is not connected on this page yet. It answers when the site is opened from the project backend.',
+  sources: [],
+  status: 'unavailable'
+};
 const chatRequestTimeoutMs = 45000;
 // Sources may link to the organization's site and to the document hosts its reports and newsletters use.
 const chatSourceHosts = ['connectgovs.org', 'drive.google.com', 'docs.google.com', 'eepurl.com', 'mailchi.mp'];
@@ -105,6 +111,7 @@ async function sendChatMessage(question) {
     body: JSON.stringify({ question, history: asked.slice(-6) }),
     signal: AbortSignal.timeout(chatRequestTimeoutMs)
   });
+  if (response.status === 404 || response.status === 405) return chatNotConnected;
   if (!response.ok) throw new Error(`Chat request failed with status ${response.status}`);
   return response.json();
 }
