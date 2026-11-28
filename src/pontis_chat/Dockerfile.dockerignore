@@ -1,0 +1,13 @@
+*
+!pyproject.toml
+!uv.lock
+!src/
+!src/**
+!main.py
+!index.html
+!app.js
+!styles.css
+**/__pycache__/
+**/.env
+**/.env.*
+**/data/
